@@ -1,73 +1,105 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Low Res Car Game</title>
-  <style>
-    body {
-      background: #111;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    canvas {
-      border: 2px solid white;
-      image-rendering: pixelated;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Driving Simulator</title>
+<style>
+body { margin:0; overflow:hidden; background:#111; font-family:Arial;}
+#hud {
+ position:absolute;
+ top:10px;
+ left:15px;
+ color:white;
+ font-size:18px;
+}
+</style>
 </head>
 <body>
 
-<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="hud">Speed: <span id="speed">0</span> km/h</div>
+<canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const speedText = document.getElementById("speed");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 let car = {
-  x: 300,
-  y: 200,
-  width: 20,
-  height: 10,
-  speed: 0,
-  angle: 0
+ x:0,
+ y:0,
+ angle:0,
+ speed:0,
+ accel:0.2,
+ maxSpeed:7,
+ friction:0.05,
+ turn:0.04
 };
 
-const keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+const keys={};
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
-function update() {
-  if (keys["ArrowUp"]) car.speed += 0.1;
-  if (keys["ArrowDown"]) car.speed -= 0.1;
+function update(){
+ if(keys["ArrowUp"]) car.speed+=car.accel;
+ if(keys["ArrowDown"]) car.speed-=car.accel;
 
-  car.speed *= 0.98;
+ if(car.speed>car.maxSpeed) car.speed=car.maxSpeed;
+ if(car.speed<-car.maxSpeed/2) car.speed=-car.maxSpeed/2;
 
-  if (keys["ArrowLeft"]) car.angle -= 0.03;
-  if (keys["ArrowRight"]) car.angle += 0.03;
+ if(car.speed>0) car.speed-=car.friction;
+ if(car.speed<0) car.speed+=car.friction;
+ if(Math.abs(car.speed)<car.friction) car.speed=0;
 
-  car.x += Math.cos(car.angle) * car.speed;
-  car.y += Math.sin(car.angle) * car.speed;
+ if(car.speed!==0){
+  let dir=car.speed>0?1:-1;
+  if(keys["ArrowLeft"]) car.angle-=car.turn*dir;
+  if(keys["ArrowRight"]) car.angle+=car.turn*dir;
+ }
+
+ car.x+=Math.cos(car.angle)*car.speed;
+ car.y+=Math.sin(car.angle)*car.speed;
+
+ speedText.textContent=Math.abs(Math.round(car.speed*40));
 }
 
-function drawCar() {
-  ctx.save();
-  ctx.translate(car.x, car.y);
-  ctx.rotate(car.angle);
-  ctx.fillStyle = "red";
-  ctx.fillRect(-car.width/2, -car.height/2, car.width, car.height);
-  ctx.restore();
+function drawRoad(){
+ ctx.fillStyle="#2b2b2b";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ ctx.strokeStyle="#fff";
+ ctx.setLineDash([25,25]);
+ ctx.lineWidth=2;
+
+ for(let i=-2000;i<2000;i+=60){
+  ctx.beginPath();
+  ctx.moveTo(canvas.width/2+i-car.x,0);
+  ctx.lineTo(canvas.width/2+i-car.x,canvas.height);
+  ctx.stroke();
+ }
 }
 
-function loop() {
-  ctx.fillStyle = "#222";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawCar(){
+ ctx.save();
+ ctx.translate(canvas.width/2,canvas.height/2);
+ ctx.rotate(car.angle);
 
-  update();
-  drawCar();
+ ctx.fillStyle="#e63946";
+ ctx.fillRect(-30,-15,60,30);
 
-  requestAnimationFrame(loop);
+ ctx.fillStyle="#111";
+ ctx.fillRect(-18,-12,36,24);
+
+ ctx.restore();
+}
+
+function loop(){
+ update();
+ drawRoad();
+ drawCar();
+ requestAnimationFrame(loop);
 }
 loop();
 </script>
