@@ -2,98 +2,125 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Advanced Car Game</title>
+<title>Car Game</title>
+
 <style>
-  body { margin:0; overflow:hidden; background:#111; font-family:Arial; }
-  canvas { display:block; }
-  #hud{
-    position:fixed;
-    top:10px;
-    left:10px;
-    color:#fff;
-    font-size:14px;
-    background:rgba(0,0,0,0.4);
-    padding:8px 12px;
-    border-radius:8px;
-  }
+body{
+  margin:0;
+  overflow:hidden;
+  font-family:Arial;
+  background:#111;
+}
+
+canvas{ display:none; }
+
+#menu{
+  position:fixed;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  background:linear-gradient(#0f2027,#203a43,#2c5364);
+  color:white;
+  text-align:center;
+}
+
+#menu h1{
+  font-size:48px;
+  margin-bottom:20px;
+}
+
+#playBtn{
+  padding:15px 35px;
+  font-size:20px;
+  border:none;
+  border-radius:10px;
+  background:#e53935;
+  color:white;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+#playBtn:hover{
+  transform:scale(1.1);
+}
+
+#hud{
+  position:fixed;
+  top:10px;
+  left:10px;
+  color:#fff;
+  font-size:14px;
+  background:rgba(0,0,0,0.4);
+  padding:8px 12px;
+  border-radius:8px;
+  display:none;
+}
 </style>
 </head>
+
 <body>
+
+<div id="menu">
+  <h1>Realistic Car Game</h1>
+  <button id="playBtn">▶ Play</button>
+</div>
+
 <canvas id="game"></canvas>
 <div id="hud">Speed: 0</div>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-const hud = document.getElementById("hud");
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const hud=document.getElementById("hud");
+const menu=document.getElementById("menu");
+const playBtn=document.getElementById("playBtn");
 
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+window.addEventListener("resize",resize);
 
-let keys = {};
+// Start game
+playBtn.onclick=()=>{
+  menu.style.display="none";
+  canvas.style.display="block";
+  hud.style.display="block";
+  startGame();
+};
+
+function startGame(){
+
+let keys={};
 window.addEventListener("keydown",e=>keys[e.key]=true);
 window.addEventListener("keyup",e=>keys[e.key]=false);
 
-// CAR
-let car = {
-  x:0,
-  y:0,
-  angle:0,
-  speed:0,
-  accel:0.25,
-  maxSpeed:9,
-  friction:0.06,
-  turnRate:0.045,
-  grip:0.92
-};
+let car={x:0,y:0,angle:0,speed:0,accel:0.25,maxSpeed:9,friction:0.06,turnRate:0.045};
+let cam={x:0,y:0,smooth:0.08};
 
-// CAMERA
-let cam = {x:0,y:0,smooth:0.08};
-
-// OBSTACLES
 let obstacles=[];
 for(let i=0;i<40;i++){
-  obstacles.push({
-    x:(Math.random()-0.5)*2000,
-    y:(Math.random()-0.5)*2000,
-    r:30+Math.random()*20
-  });
+  obstacles.push({x:(Math.random()-0.5)*2000,y:(Math.random()-0.5)*2000,r:30+Math.random()*20});
 }
 
 function physics(){
-
-  if(keys["ArrowUp"]||keys["w"]) car.speed+=car.accel;
-  if(keys["ArrowDown"]||keys["s"]) car.speed-=car.accel;
-
+  if(keys["ArrowUp"]) car.speed+=car.accel;
+  if(keys["ArrowDown"]) car.speed-=car.accel;
   car.speed=Math.max(-car.maxSpeed/2,Math.min(car.speed,car.maxSpeed));
 
-  if(!keys["ArrowUp"]&&!keys["ArrowDown"]){
-    car.speed*=0.98;
-    if(Math.abs(car.speed)<0.02) car.speed=0;
-  }
+  if(!keys["ArrowUp"]&&!keys["ArrowDown"]) car.speed*=0.98;
 
-  if(keys["ArrowLeft"]||keys["a"])
-    car.angle-=car.turnRate*(car.speed/car.maxSpeed);
+  if(keys["ArrowLeft"]) car.angle-=car.turnRate*(car.speed/car.maxSpeed);
+  if(keys["ArrowRight"]) car.angle+=car.turnRate*(car.speed/car.maxSpeed);
 
-  if(keys["ArrowRight"]||keys["d"])
-    car.angle+=car.turnRate*(car.speed/car.maxSpeed);
+  car.x+=Math.cos(car.angle)*car.speed;
+  car.y+=Math.sin(car.angle)*car.speed;
 
-  // movement with grip
-  let vx=Math.cos(car.angle)*car.speed;
-  let vy=Math.sin(car.angle)*car.speed;
-
-  car.x+=vx;
-  car.y+=vy;
-
-  // collisions
   obstacles.forEach(o=>{
-    let dx=car.x-o.x;
-    let dy=car.y-o.y;
-    let dist=Math.hypot(dx,dy);
+    let dx=car.x-o.x,dy=car.y-o.y,dist=Math.hypot(dx,dy);
     if(dist<o.r+12){
       car.speed*=-0.4;
       car.x=o.x+(dx/dist)*(o.r+12);
@@ -101,29 +128,19 @@ function physics(){
     }
   });
 
-  // camera follow
-  cam.x += (car.x - cam.x) * cam.smooth;
-  cam.y += (car.y - cam.y) * cam.smooth;
+  cam.x+=(car.x-cam.x)*cam.smooth;
+  cam.y+=(car.y-cam.y)*cam.smooth;
 }
 
 function drawGrid(){
   ctx.fillStyle="#2a2a2a";
   ctx.fillRect(-5000,-5000,10000,10000);
-
   ctx.strokeStyle="#3a3a3a";
-  ctx.lineWidth=1;
-
   for(let x=-5000;x<5000;x+=100){
-    ctx.beginPath();
-    ctx.moveTo(x,-5000);
-    ctx.lineTo(x,5000);
-    ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x,-5000);ctx.lineTo(x,5000);ctx.stroke();
   }
   for(let y=-5000;y<5000;y+=100){
-    ctx.beginPath();
-    ctx.moveTo(-5000,y);
-    ctx.lineTo(5000,y);
-    ctx.stroke();
+    ctx.beginPath();ctx.moveTo(-5000,y);ctx.lineTo(5000,y);ctx.stroke();
   }
 }
 
@@ -137,42 +154,26 @@ function drawObstacles(){
 }
 
 function drawCar(){
-
   ctx.save();
   ctx.translate(car.x,car.y);
   ctx.rotate(car.angle);
-
-  // shadow
   ctx.fillStyle="rgba(0,0,0,0.4)";
   ctx.fillRect(-18,-10,36,20);
-
-  // body
   ctx.fillStyle="#e53935";
   ctx.fillRect(-16,-8,32,16);
-
-  // roof
-  ctx.fillStyle="#c62828";
-  ctx.fillRect(-6,-7,12,14);
-
-  // windshield
   ctx.fillStyle="#90caf9";
   ctx.fillRect(2,-6,8,12);
-
   ctx.restore();
 }
 
 function render(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
   ctx.save();
   ctx.translate(canvas.width/2-cam.x,canvas.height/2-cam.y);
-
   drawGrid();
   drawObstacles();
   drawCar();
-
   ctx.restore();
-
   hud.textContent="Speed: "+Math.round(Math.abs(car.speed*12))+" km/h";
 }
 
@@ -182,6 +183,8 @@ function loop(){
   requestAnimationFrame(loop);
 }
 loop();
+}
 </script>
+
 </body>
 </html>
