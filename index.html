@@ -5,184 +5,187 @@
 <title>Car Game</title>
 
 <style>
-body{
-  margin:0;
-  overflow:hidden;
-  font-family:Arial;
-  background:#111;
+body{margin:0;overflow:hidden;font-family:Arial;background:#111;color:white}
+canvas{display:none}
+.screen{
+ position:fixed; inset:0; display:flex;
+ flex-direction:column; justify-content:center;
+ align-items:center; background:linear-gradient(#0f2027,#203a43,#2c5364);
 }
-
-canvas{ display:none; }
-
-#menu{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  background:linear-gradient(#0f2027,#203a43,#2c5364);
-  color:white;
-  text-align:center;
+button{
+ padding:12px 28px; margin:8px;
+ font-size:18px; border:none; border-radius:8px;
+ background:#e53935; color:white; cursor:pointer;
 }
-
-#menu h1{
-  font-size:48px;
-  margin-bottom:20px;
-}
-
-#playBtn{
-  padding:15px 35px;
-  font-size:20px;
-  border:none;
-  border-radius:10px;
-  background:#e53935;
-  color:white;
-  cursor:pointer;
-  transition:0.2s;
-}
-
-#playBtn:hover{
-  transform:scale(1.1);
-}
-
-#hud{
-  position:fixed;
-  top:10px;
-  left:10px;
-  color:#fff;
-  font-size:14px;
-  background:rgba(0,0,0,0.4);
-  padding:8px 12px;
-  border-radius:8px;
-  display:none;
-}
+#hud{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.4);padding:6px 10px;border-radius:6px;display:none}
 </style>
 </head>
 
 <body>
 
-<div id="menu">
+<!-- MAIN MENU -->
+<div id="menu" class="screen">
   <h1>Realistic Car Game</h1>
-  <button id="playBtn">▶ Play</button>
+  <button id="playBtn">Play</button>
+  <button id="settingsBtn">Settings</button>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="screen" style="display:none">
+  <h2>Settings</h2>
+  <label>Music Volume <input type="range" id="volume" min="0" max="1" step="0.01" value="0.3"></label>
+  <button id="backBtn">Back</button>
+</div>
+
+<!-- PAUSE -->
+<div id="pause" class="screen" style="display:none">
+  <h2>Paused</h2>
+  <button id="resumeBtn">Resume</button>
+  <button id="quitBtn">Quit</button>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover" class="screen" style="display:none">
+  <h2>Game Over</h2>
+  <button id="restartBtn">Restart</button>
 </div>
 
 <canvas id="game"></canvas>
 <div id="hud">Speed: 0</div>
 
+<audio id="music" loop>
+  <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_5c9a1c1c7a.mp3">
+</audio>
+
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+const canvas=game,ctx=canvas.getContext("2d");
 const hud=document.getElementById("hud");
-const menu=document.getElementById("menu");
-const playBtn=document.getElementById("playBtn");
+const music=document.getElementById("music");
 
-function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
-}
-resize();
-window.addEventListener("resize",resize);
-
-// Start game
-playBtn.onclick=()=>{
-  menu.style.display="none";
-  canvas.style.display="block";
-  hud.style.display="block";
-  startGame();
+const screens={
+ menu,settings,pause,gameover
 };
 
+function show(id){
+ for(let s in screens) screens[s].style.display="none";
+ screens[id].style.display="flex";
+}
+
+playBtn.onclick=()=>startGame();
+settingsBtn.onclick=()=>show("settings");
+backBtn.onclick=()=>show("menu");
+resumeBtn.onclick=()=>togglePause(false);
+quitBtn.onclick=()=>location.reload();
+restartBtn.onclick=()=>startGame();
+
+volume.oninput=e=>music.volume=e.target.value;
+
+function resize(){
+ canvas.width=innerWidth;
+ canvas.height=innerHeight;
+}
+resize(); addEventListener("resize",resize);
+
+let car,cam,keys,obstacles,paused=false;
+
 function startGame(){
+ show("menu"); menu.style.display="none";
+ canvas.style.display="block"; hud.style.display="block";
+ music.play();
+ init();
+ loop();
+}
 
-let keys={};
-window.addEventListener("keydown",e=>keys[e.key]=true);
-window.addEventListener("keyup",e=>keys[e.key]=false);
+function init(){
+ car={x:0,y:0,angle:0,speed:0,accel:0.25,maxSpeed:9,friction:0.06,turn:0.045};
+ cam={x:0,y:0};
+ keys={};
+ obstacles=[];
+ for(let i=0;i<40;i++) obstacles.push({x:(Math.random()-0.5)*2000,y:(Math.random()-0.5)*2000,r:25+Math.random()*20});
+}
 
-let car={x:0,y:0,angle:0,speed:0,accel:0.25,maxSpeed:9,friction:0.06,turnRate:0.045};
-let cam={x:0,y:0,smooth:0.08};
+onkeydown=e=>{
+ keys[e.key]=true;
+ if(e.key==="Escape") togglePause();
+};
+onkeyup=e=>keys[e.key]=false;
 
-let obstacles=[];
-for(let i=0;i<40;i++){
-  obstacles.push({x:(Math.random()-0.5)*2000,y:(Math.random()-0.5)*2000,r:30+Math.random()*20});
+function togglePause(force){
+ paused=force!==undefined?force:!paused;
+ if(paused) show("pause"); else show("");
 }
 
 function physics(){
-  if(keys["ArrowUp"]) car.speed+=car.accel;
-  if(keys["ArrowDown"]) car.speed-=car.accel;
-  car.speed=Math.max(-car.maxSpeed/2,Math.min(car.speed,car.maxSpeed));
+ if(keys.ArrowUp) car.speed+=car.accel;
+ if(keys.ArrowDown) car.speed-=car.accel;
+ car.speed=Math.max(-car.maxSpeed/2,Math.min(car.speed,car.maxSpeed));
+ car.speed*=0.98;
 
-  if(!keys["ArrowUp"]&&!keys["ArrowDown"]) car.speed*=0.98;
+ if(keys.ArrowLeft) car.angle-=car.turn*(car.speed/car.maxSpeed);
+ if(keys.ArrowRight) car.angle+=car.turn*(car.speed/car.maxSpeed);
 
-  if(keys["ArrowLeft"]) car.angle-=car.turnRate*(car.speed/car.maxSpeed);
-  if(keys["ArrowRight"]) car.angle+=car.turnRate*(car.speed/car.maxSpeed);
+ car.x+=Math.cos(car.angle)*car.speed;
+ car.y+=Math.sin(car.angle)*car.speed;
 
-  car.x+=Math.cos(car.angle)*car.speed;
-  car.y+=Math.sin(car.angle)*car.speed;
+ obstacles.forEach(o=>{
+  let dx=car.x-o.x,dy=car.y-o.y,dist=Math.hypot(dx,dy);
+  if(dist<o.r+12){
+    show("gameover");
+    paused=true;
+  }
+ });
 
-  obstacles.forEach(o=>{
-    let dx=car.x-o.x,dy=car.y-o.y,dist=Math.hypot(dx,dy);
-    if(dist<o.r+12){
-      car.speed*=-0.4;
-      car.x=o.x+(dx/dist)*(o.r+12);
-      car.y=o.y+(dy/dist)*(o.r+12);
-    }
-  });
-
-  cam.x+=(car.x-cam.x)*cam.smooth;
-  cam.y+=(car.y-cam.y)*cam.smooth;
+ cam.x+=(car.x-cam.x)*0.08;
+ cam.y+=(car.y-cam.y)*0.08;
 }
 
-function drawGrid(){
-  ctx.fillStyle="#2a2a2a";
-  ctx.fillRect(-5000,-5000,10000,10000);
-  ctx.strokeStyle="#3a3a3a";
-  for(let x=-5000;x<5000;x+=100){
-    ctx.beginPath();ctx.moveTo(x,-5000);ctx.lineTo(x,5000);ctx.stroke();
-  }
-  for(let y=-5000;y<5000;y+=100){
-    ctx.beginPath();ctx.moveTo(-5000,y);ctx.lineTo(5000,y);ctx.stroke();
-  }
-}
+function drawWorld(){
+ ctx.fillStyle="#2a2a2a";
+ ctx.fillRect(-5000,-5000,10000,10000);
 
-function drawObstacles(){
-  obstacles.forEach(o=>{
-    ctx.beginPath();
-    ctx.fillStyle="#555";
-    ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
-    ctx.fill();
-  });
+ ctx.strokeStyle="#3a3a3a";
+ for(let i=-5000;i<5000;i+=100){
+  ctx.beginPath();ctx.moveTo(i,-5000);ctx.lineTo(i,5000);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-5000,i);ctx.lineTo(5000,i);ctx.stroke();
+ }
+
+ obstacles.forEach(o=>{
+  ctx.beginPath();
+  ctx.fillStyle="#555";
+  ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
+  ctx.fill();
+ });
 }
 
 function drawCar(){
-  ctx.save();
-  ctx.translate(car.x,car.y);
-  ctx.rotate(car.angle);
-  ctx.fillStyle="rgba(0,0,0,0.4)";
-  ctx.fillRect(-18,-10,36,20);
-  ctx.fillStyle="#e53935";
-  ctx.fillRect(-16,-8,32,16);
-  ctx.fillStyle="#90caf9";
-  ctx.fillRect(2,-6,8,12);
-  ctx.restore();
+ ctx.save();
+ ctx.translate(car.x,car.y);
+ ctx.rotate(car.angle);
+ ctx.fillStyle="rgba(0,0,0,0.4)";
+ ctx.fillRect(-18,-10,36,20);
+ ctx.fillStyle="#e53935";
+ ctx.fillRect(-16,-8,32,16);
+ ctx.fillStyle="#90caf9";
+ ctx.fillRect(2,-6,8,12);
+ ctx.restore();
 }
 
 function render(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.save();
-  ctx.translate(canvas.width/2-cam.x,canvas.height/2-cam.y);
-  drawGrid();
-  drawObstacles();
-  drawCar();
-  ctx.restore();
-  hud.textContent="Speed: "+Math.round(Math.abs(car.speed*12))+" km/h";
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.save();
+ ctx.translate(canvas.width/2-cam.x,canvas.height/2-cam.y);
+ drawWorld();
+ drawCar();
+ ctx.restore();
+ hud.textContent="Speed: "+Math.round(Math.abs(car.speed*12))+" km/h";
 }
 
 function loop(){
+ if(!paused){
   physics();
   render();
-  requestAnimationFrame(loop);
-}
-loop();
+ }
+ requestAnimationFrame(loop);
 }
 </script>
 
