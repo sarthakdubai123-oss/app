@@ -1,83 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Advanced Car Game</title>
+<style>
+  body { margin:0; overflow:hidden; background:#111; font-family:Arial; }
+  canvas { display:block; }
+  #hud{
+    position:fixed;
+    top:10px;
+    left:10px;
+    color:#fff;
+    font-size:14px;
+    background:rgba(0,0,0,0.4);
+    padding:8px 12px;
+    border-radius:8px;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">Speed: 0</div>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-const speedText = document.getElementById("speed");
+const hud = document.getElementById("hud");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
 
-const carImg = new Image();
-carImg.src = "car.png";
+let keys = {};
+window.addEventListener("keydown",e=>keys[e.key]=true);
+window.addEventListener("keyup",e=>keys[e.key]=false);
 
+// CAR
 let car = {
- x:0,
- y:0,
- angle:0,
- speed:0,
- accel:0.2,
- maxSpeed:7,
- friction:0.05,
- turn:0.04
+  x:0,
+  y:0,
+  angle:0,
+  speed:0,
+  accel:0.25,
+  maxSpeed:9,
+  friction:0.06,
+  turnRate:0.045,
+  grip:0.92
 };
 
-const keys={};
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
+// CAMERA
+let cam = {x:0,y:0,smooth:0.08};
 
-function update(){
- if(keys["ArrowUp"]) car.speed+=car.accel;
- if(keys["ArrowDown"]) car.speed-=car.accel;
-
- if(car.speed>car.maxSpeed) car.speed=car.maxSpeed;
- if(car.speed<-car.maxSpeed/2) car.speed=-car.maxSpeed/2;
-
- if(car.speed>0) car.speed-=car.friction;
- if(car.speed<0) car.speed+=car.friction;
- if(Math.abs(car.speed)<car.friction) car.speed=0;
-
- if(car.speed!==0){
-  let dir=car.speed>0?1:-1;
-  if(keys["ArrowLeft"]) car.angle-=car.turn*dir;
-  if(keys["ArrowRight"]) car.angle+=car.turn*dir;
- }
-
- car.x+=Math.cos(car.angle)*car.speed;
- car.y+=Math.sin(car.angle)*car.speed;
-
- speedText.textContent=Math.abs(Math.round(car.speed*40));
+// OBSTACLES
+let obstacles=[];
+for(let i=0;i<40;i++){
+  obstacles.push({
+    x:(Math.random()-0.5)*2000,
+    y:(Math.random()-0.5)*2000,
+    r:30+Math.random()*20
+  });
 }
 
-function drawRoad(){
- ctx.fillStyle="#2b2b2b";
- ctx.fillRect(0,0,canvas.width,canvas.height);
+function physics(){
 
- ctx.strokeStyle="#fff";
- ctx.setLineDash([25,25]);
- ctx.lineWidth=2;
+  if(keys["ArrowUp"]||keys["w"]) car.speed+=car.accel;
+  if(keys["ArrowDown"]||keys["s"]) car.speed-=car.accel;
 
- for(let i=-2000;i<2000;i+=60){
-  ctx.beginPath();
-  ctx.moveTo(canvas.width/2+i-car.x,0);
-  ctx.lineTo(canvas.width/2+i-car.x,canvas.height);
-  ctx.stroke();
- }
+  car.speed=Math.max(-car.maxSpeed/2,Math.min(car.speed,car.maxSpeed));
+
+  if(!keys["ArrowUp"]&&!keys["ArrowDown"]){
+    car.speed*=0.98;
+    if(Math.abs(car.speed)<0.02) car.speed=0;
+  }
+
+  if(keys["ArrowLeft"]||keys["a"])
+    car.angle-=car.turnRate*(car.speed/car.maxSpeed);
+
+  if(keys["ArrowRight"]||keys["d"])
+    car.angle+=car.turnRate*(car.speed/car.maxSpeed);
+
+  // movement with grip
+  let vx=Math.cos(car.angle)*car.speed;
+  let vy=Math.sin(car.angle)*car.speed;
+
+  car.x+=vx;
+  car.y+=vy;
+
+  // collisions
+  obstacles.forEach(o=>{
+    let dx=car.x-o.x;
+    let dy=car.y-o.y;
+    let dist=Math.hypot(dx,dy);
+    if(dist<o.r+12){
+      car.speed*=-0.4;
+      car.x=o.x+(dx/dist)*(o.r+12);
+      car.y=o.y+(dy/dist)*(o.r+12);
+    }
+  });
+
+  // camera follow
+  cam.x += (car.x - cam.x) * cam.smooth;
+  cam.y += (car.y - cam.y) * cam.smooth;
+}
+
+function drawGrid(){
+  ctx.fillStyle="#2a2a2a";
+  ctx.fillRect(-5000,-5000,10000,10000);
+
+  ctx.strokeStyle="#3a3a3a";
+  ctx.lineWidth=1;
+
+  for(let x=-5000;x<5000;x+=100){
+    ctx.beginPath();
+    ctx.moveTo(x,-5000);
+    ctx.lineTo(x,5000);
+    ctx.stroke();
+  }
+  for(let y=-5000;y<5000;y+=100){
+    ctx.beginPath();
+    ctx.moveTo(-5000,y);
+    ctx.lineTo(5000,y);
+    ctx.stroke();
+  }
+}
+
+function drawObstacles(){
+  obstacles.forEach(o=>{
+    ctx.beginPath();
+    ctx.fillStyle="#555";
+    ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
+    ctx.fill();
+  });
 }
 
 function drawCar(){
- ctx.save();
- ctx.translate(canvas.width/2,canvas.height/2);
- ctx.rotate(car.angle);
 
- ctx.drawImage(carImg,-30,-60,60,120);
+  ctx.save();
+  ctx.translate(car.x,car.y);
+  ctx.rotate(car.angle);
 
- ctx.restore();
+  // shadow
+  ctx.fillStyle="rgba(0,0,0,0.4)";
+  ctx.fillRect(-18,-10,36,20);
+
+  // body
+  ctx.fillStyle="#e53935";
+  ctx.fillRect(-16,-8,32,16);
+
+  // roof
+  ctx.fillStyle="#c62828";
+  ctx.fillRect(-6,-7,12,14);
+
+  // windshield
+  ctx.fillStyle="#90caf9";
+  ctx.fillRect(2,-6,8,12);
+
+  ctx.restore();
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width/2-cam.x,canvas.height/2-cam.y);
+
+  drawGrid();
+  drawObstacles();
+  drawCar();
+
+  ctx.restore();
+
+  hud.textContent="Speed: "+Math.round(Math.abs(car.speed*12))+" km/h";
 }
 
 function loop(){
- update();
- drawRoad();
- drawCar();
- requestAnimationFrame(loop);
+  physics();
+  render();
+  requestAnimationFrame(loop);
 }
 loop();
 </script>
+</body>
+</html>
