@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minimal Reminder</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <h1>Reminders</h1>
+      <form id="reminder-form" autocomplete="off">
+        <input id="reminder-input" type="text" placeholder="Add a reminder..." maxlength="120" required />
+        <button type="submit">Add</button>
+      </form>
+      <ul id="reminder-list" aria-live="polite"></ul>
+      <p id="empty-state">No reminders yet.</p>
+    </main>
+
+    <template id="reminder-item-template">
+      <li class="reminder-item">
+        <label>
+          <input type="checkbox" />
+          <span class="text"></span>
+        </label>
+        <button class="delete" type="button" aria-label="Delete reminder">✕</button>
+      </li>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
