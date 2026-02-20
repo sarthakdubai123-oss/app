@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Low Res Car Game</title>
+  <style>
+    body {
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    canvas {
+      border: 2px solid white;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let car = {
+  x: 300,
+  y: 200,
+  width: 20,
+  height: 10,
+  speed: 0,
+  angle: 0
+};
+
+const keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+function update() {
+  if (keys["ArrowUp"]) car.speed += 0.1;
+  if (keys["ArrowDown"]) car.speed -= 0.1;
+
+  car.speed *= 0.98;
+
+  if (keys["ArrowLeft"]) car.angle -= 0.03;
+  if (keys["ArrowRight"]) car.angle += 0.03;
+
+  car.x += Math.cos(car.angle) * car.speed;
+  car.y += Math.sin(car.angle) * car.speed;
+}
+
+function drawCar() {
+  ctx.save();
+  ctx.translate(car.x, car.y);
+  ctx.rotate(car.angle);
+  ctx.fillStyle = "red";
+  ctx.fillRect(-car.width/2, -car.height/2, car.width, car.height);
+  ctx.restore();
+}
+
+function loop() {
+  ctx.fillStyle = "#222";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  update();
+  drawCar();
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
